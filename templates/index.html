@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MeteoBot</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌦️</text></svg>">
+    <style>
+        .tab-container {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #444;
+        }
+        
+        .tab-btn {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+        
+        .tab-btn.active {
+            color: var(--accent);
+            border-bottom: 3px solid var(--accent);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .forecast-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .forecast-card {
+            background: var(--card-bg);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            transition: transform 0.3s;
+        }
+        
+        .forecast-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .forecast-date {
+            font-weight: bold;
+            color: var(--accent-secondary);
+            margin-bottom: 8px;
+        }
+        
+        .forecast-temp {
+            font-size: 1.2rem;
+            margin: 5px 0;
+        }
+        
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .search-box {
+            background: var(--bg-secondary);
+            padding: 20px;
+            border-radius: 8px;
+        }
+        
+        .results-container {
+            background: var(--bg-secondary);
+            padding: 20px;
+            border-radius: 8px;
+            min-height: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><i class="fas fa-cloud-sun"></i> MeteoBot</h1>
+        
+        <div class="main-content">
+            <div class="search-box">
+                <div class="tab-container">
+                    <button class="tab-btn active" onclick="switchTab('current')">
+                        <i class="fas fa-sun"></i> Attuale
+                    </button>
+                    <button class="tab-btn" onclick="switchTab('forecast')">
+                        <i class="fas fa-calendar-alt"></i> Previsioni
+                    </button>
+                </div>
+                
+                <div class="input-container">
+                    <input 
+                        type="text" 
+                        id="cityInput" 
+                        placeholder="Cerca una città..."
+                        autocomplete="off"
+                    >
+                    <button onclick="getWeather()">
+                        <i class="fas fa-search"></i> Cerca
+                    </button>
+                </div>
+            </div>
+            
+            <div class="results-container">
+                <div id="current-tab" class="tab-content active">
+                </div>
+                
+                <div id="forecast-tab" class="tab-content">
+                    <div id="forecast-results"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentCity = '';
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelector('.container').style.opacity = '1';
+        });
+        
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+            document.querySelector(`.tab-btn[onclick="switchTab('${tabName}')"]`).classList.add('active');
+            
+            if (tabName === 'forecast' && currentCity) {
+                getForecast();
+            }
+        }
+        
+        async function getWeather() {
+            const city = document.getElementById('cityInput').value.trim();
+            if (!city) return;
+            
+            currentCity = city;
+            
+            const activeTab = document.querySelector('.tab-content.active');
+            const loader = createLoader();
+            activeTab.innerHTML = '';
+            activeTab.appendChild(loader);
+            
+            try {
+                const currentResponse = await fetch('/get_weather', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ city })
+                });
+                
+                const currentData = await currentResponse.json();
+                
+                if (currentData.error) {
+                    throw new Error(currentData.error);
+                }
+                
+                displayCurrentWeather(currentData);
+                
+            } catch (err) {
+                activeTab.innerHTML = `<div class="error">⚠️ ${err.message}</div>`;
+            } finally {
+                loader.remove();
+                document.getElementById('cityInput').value = '';
+            }
+        }
+        
+        async function getForecast() {
+            if (!currentCity) return;
+            
+            const forecastContainer = document.getElementById('forecast-results');
+            forecastContainer.innerHTML = '';
+            
+            const loader = createLoader();
+            forecastContainer.appendChild(loader);
+            
+            try {
+                const forecastResponse = await fetch('/get_forecast', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ city: currentCity })
+                });
+                
+                const forecastData = await forecastResponse.json();
+                
+                if (forecastData.error) {
+                    throw new Error(forecastData.error);
+                }
+                
+                displayForecast(forecastData);
+                
+            } catch (err) {
+                forecastContainer.innerHTML = `<div class="error">⚠️ ${err.message}</div>`;
+            } finally {
+                loader.remove();
+            }
+        }
+        
+        function displayCurrentWeather(data) {
+            const currentTab = document.getElementById('current-tab');
+            currentTab.innerHTML = `
+                <div class="weather-card">
+                    <div class="weather-header">
+                        <h3><i class="fas fa-city"></i> ${data.city}</h3>
+                        <img src="http://openweathermap.org/img/wn/${data.icon}@2x.png" 
+                             alt="${data.description}">
+                    </div>
+                    <div class="temp">
+                        ${data.temp}°C
+                    </div>
+                    <div class="desc">
+                        <i class="fas fa-cloud"></i> ${data.description}
+                    </div>
+                    <div class="weather-details">
+                        ${Object.entries(data.details).map(([key, value]) => `
+                            <div>
+                                <strong><i class="fas fa-${getIcon(key)}"></i> ${key}:</strong> 
+                                ${value}
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="timestamp">
+                        <i class="far fa-clock"></i> ${data.timestamp}
+                    </div>
+                </div>
+            `;
+        }
+        
+        function displayForecast(data) {
+            const forecastContainer = document.getElementById('forecast-results');
+            forecastContainer.innerHTML = `
+                <h3><i class="fas fa-calendar-week"></i> Previsioni per ${currentCity}</h3>
+                <div class="forecast-grid">
+                    ${data.map(day => `
+                        <div class="forecast-card">
+                            <div class="forecast-date">
+                                ${formatDate(day.date)}
+                            </div>
+                            <img src="http://openweathermap.org/img/wn/${day.icon}@2x.png" 
+                                 alt="${day.description}" style="width: 50px; height: 50px;">
+                            <div class="forecast-temp">
+                                ${day.temp}°C
+                            </div>
+                            <div class="desc">
+                                ${day.description}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+        
+        function createLoader() {
+            const loader = document.createElement('div');
+            loader.className = 'loader';
+            return loader;
+        }
+        
+        function getIcon(key) {
+            const icons = {
+                'Percepito': 'temperature-low',
+                'Umidità': 'tint',
+                'Vento': 'wind'
+            };
+            return icons[key] || 'info-circle';
+        }
+        
+        function formatDate(dateStr) {
+            const options = { weekday: 'short', day: 'numeric', month: 'short' };
+            return new Date(dateStr).toLocaleDateString('it-IT', options);
+        }
+    </script>
+</body>
+</html>
