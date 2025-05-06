@@ -17,7 +17,7 @@ Un'applicazione Flask che fornisce informazioni meteo attuali e previsioni con u
 - **API**: OpenWeatherMap
 - **Icone**: Font Awesome
 
-!(screenshots/Screenshot1.png)
+![DEMO](screenshots/Screenshot1.png)
 
 
 ## 🚀 Installazione
