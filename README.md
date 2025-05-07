@@ -22,7 +22,7 @@ Un'applicazione Flask che fornisce informazioni meteo attuali e previsioni con u
 ![DEMO](screenshots/Screenshot2.png)
 
 ## 🚀 Installazione
-1. Clona il repository:
+1. Clona repository:
 ```bash
 git clone https://github.com/mttgvnrd/MeteoBot.git
 
